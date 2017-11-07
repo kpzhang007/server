@@ -3821,34 +3821,23 @@ FlushObserver::notify_remove(
 void
 FlushObserver::flush()
 {
-	buf_remove_t	buf_remove;
-
-	if (!m_interrupted) {
-		buf_remove = BUF_REMOVE_FLUSH_WRITE;
-
-		if (m_stage != NULL) {
-			ulint	pages_to_flush =
-				buf_flush_get_dirty_pages_count(
-					m_space_id, this);
-
-			m_stage->begin_phase_flush(pages_to_flush);
-		}
-	} else {
-		/* FIXME: If this is ALTER...LOCK=NONE, we should not
-		discard changes from concurrent DML statements to
-		already committed indexes in the data file. */
-
-		/* FIXME: Discard all changes to only those pages that
-		will be freed by the clean-up of the ALTER operation.
-		(This is an important performance improvement for the
-		system tablespace.) */
-		buf_remove = m_space_id
-			? BUF_REMOVE_FLUSH_NO_WRITE
-			: BUF_REMOVE_FLUSH_WRITE;
+	if (!m_interrupted && m_stage) {
+		m_stage->begin_phase_flush(buf_flush_get_dirty_pages_count(
+						   m_space_id, this));
 	}
 
 	/* Flush or remove dirty pages. */
-	buf_LRU_flush_or_remove_pages(m_space_id, buf_remove, m_trx);
+
+	/* FIXME: If this is ALTER...LOCK=NONE, we must not
+	discard changes from concurrent DML statements to
+	already committed indexes in the data file. */
+
+	/* FIXME: Discard all changes to only those pages that
+	will be freed by the clean-up of the ALTER operation.
+	(This is an important performance improvement for the
+	system tablespace.) */
+	buf_LRU_flush_or_remove_pages(m_space_id, m_space_id && m_interrupted
+				      ? NULL : m_trx);
 
 	/* Wait for all dirty pages were flushed. */
 	for (ulint i = 0; i < srv_buf_pool_instances; i++) {
