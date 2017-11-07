@@ -3828,16 +3828,18 @@ FlushObserver::flush()
 
 	/* Flush or remove dirty pages. */
 
-	/* FIXME: If this is ALTER...LOCK=NONE, we must not
+	/* NOTE: If this is ALTER...LOCK=NONE, we must not
 	discard changes from concurrent DML statements to
 	already committed indexes in the data file. */
+
+	/* NOTE: We must not discard unrelated changes to
+	the InnoDB system tablespace either. */
 
 	/* FIXME: Discard all changes to only those pages that
 	will be freed by the clean-up of the ALTER operation.
 	(This is an important performance improvement for the
 	system tablespace.) */
-	buf_LRU_flush_or_remove_pages(m_space_id, m_space_id && m_interrupted
-				      ? NULL : m_trx);
+	buf_LRU_flush_or_remove_pages(m_space_id, m_trx);
 
 	/* Wait for all dirty pages were flushed. */
 	for (ulint i = 0; i < srv_buf_pool_instances; i++) {
