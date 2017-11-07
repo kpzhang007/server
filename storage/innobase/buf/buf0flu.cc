@@ -3823,9 +3823,7 @@ FlushObserver::flush()
 {
 	buf_remove_t	buf_remove;
 
-	if (m_interrupted) {
-		buf_remove = BUF_REMOVE_FLUSH_NO_WRITE;
-	} else {
+	if (!m_interrupted) {
 		buf_remove = BUF_REMOVE_FLUSH_WRITE;
 
 		if (m_stage != NULL) {
@@ -3835,6 +3833,18 @@ FlushObserver::flush()
 
 			m_stage->begin_phase_flush(pages_to_flush);
 		}
+	} else {
+		/* FIXME: If this is ALTER...LOCK=NONE, we should not
+		discard changes from concurrent DML statements to
+		already committed indexes in the data file. */
+
+		/* FIXME: Discard all changes to only those pages that
+		will be freed by the clean-up of the ALTER operation.
+		(This is an important performance improvement for the
+		system tablespace.) */
+		buf_remove = m_space_id
+			? BUF_REMOVE_FLUSH_NO_WRITE
+			: BUF_REMOVE_FLUSH_WRITE;
 	}
 
 	/* Flush or remove dirty pages. */
